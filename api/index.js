@@ -1,13 +1,13 @@
-import { config as _config } from "dotenv";
-import express, { json } from "express";
-import multer from "multer";
-import fs from "fs";
-import cors from "cors";
-import { GoogleGenAI } from "@google/genai";
+const { config: _config } = require("dotenv");
+const express = require("express");
+const multer = require("multer");
+const fs = require("fs");
+const cors = require("cors");
+const { GoogleGenAI } = require("@google/genai");
 
 _config();
 const app = express();
-app.use(json());
+app.use(express.json());
 app.use(cors());
 
 const genAI = new GoogleGenAI({
@@ -192,3 +192,5 @@ const port = 3000;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+module.exports = app;
