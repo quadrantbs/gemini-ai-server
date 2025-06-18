@@ -14,16 +14,8 @@ const genAI = new GoogleGenAI({
   apiKey: process.env.GOOGLE_API_KEY,
 });
 
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ storage: multer.memoryStorage() });
 const model = "gemini-2.0-flash";
-
-const deleteUploadedFile = (filePath) => {
-  fs.unlinkSync(filePath, (err) => {
-    if (err) {
-      console.error("Error deleting file:", err);
-    }
-  });
-};
 
 app.get("/", (req, res) => {
   res.json({
@@ -81,9 +73,8 @@ app.post("/generate-text", async (req, res) => {
 
 app.post("/generate-from-image", upload.single("image"), async (req, res) => {
   const prompt = req.body.prompt || "Describe the image";
-  const buffer = fs.readFileSync(req.file.path);
+  const buffer = req.file.buffer;
   const base64Data = buffer.toString("base64");
-  deleteUploadedFile(req.file.path);
   const mimeType = req.file.mimetype || "image/png";
   const imagePart = {
     inlineData: {
@@ -119,8 +110,7 @@ app.post(
   upload.single("document"),
   async (req, res) => {
     const prompt = req.body.prompt || "Summarize the document";
-    const buffer = fs.readFileSync(req.file.path);
-    deleteUploadedFile(req.file.path);
+    const buffer = req.file.buffer;
     const base64Data = buffer.toString("base64");
     const mimeType = req.file.mimetype || "application/pdf";
     if (!req.file) {
@@ -155,8 +145,7 @@ app.post(
 
 app.post("/generate-from-audio", upload.single("audio"), async (req, res) => {
   const prompt = req.body.prompt || "Transcribe the audio";
-  const buffer = fs.readFileSync(req.file.path);
-  deleteUploadedFile(req.file.path);
+  const buffer = req.file.buffer;
   const base64Data = buffer.toString("base64");
   const mimeType = req.file.mimetype || "audio/mpeg";
   const audioPart = {
@@ -192,5 +181,7 @@ const port = 3000;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+module.exports = app;
 
 module.exports = app;
