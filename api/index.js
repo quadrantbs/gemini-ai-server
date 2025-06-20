@@ -62,10 +62,11 @@ app.get("/", (req, res) => {
         path: "/chat",
         description: "Interactive chat with context from previous messages",
         body: {
-          messages: [
+          message: "string (required)",
+          history: [
             {
-              sender: "user | assistant",
-              text: "string",
+              role: "user | model (required)",
+              text: "string (required)",
             },
           ],
           historyLimit: "integer (optional, default: 10)",
@@ -209,17 +210,21 @@ app.post("/generate-from-audio", upload.single("audio"), async (req, res) => {
 });
 
 app.post("/chat", async (req, res) => {
-  const { messages, historyLimit = 10 } = req.body;
+  const { message, history, historyLimit = 10 } = req.body;
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: "No messages provided." });
+  if (!Array.isArray(history) || history.length === 0) {
+    return res.status(400).json({ error: "No history provided." });
   }
 
-  const isValid = messages.every((msg) => {
+  if (!message && typeof message !== "string") {
+    return res.status(400).json({ error: "Message is required." });
+  }
+
+  const isValid = history.every((msg) => {
     return (
       typeof msg === "object" &&
       msg !== null &&
-      (msg.sender === "user" || msg.sender === "assistant") &&
+      (msg.role === "user" || msg.role === "model") &&
       typeof msg.text === "string" &&
       msg.text.trim() !== ""
     );
@@ -233,19 +238,23 @@ app.post("/chat", async (req, res) => {
   }
 
   try {
-    const recentMessages = messages.slice(-historyLimit);
+    const recentHistory = history.slice(-historyLimit);
 
-    const contents = recentMessages.map((msg) => ({
-      role: msg.sender,
-      text: msg.text,
+    const history = recentHistory.map((msg) => ({
+      role: msg.role,
+      parts: [{ text: msg.text }],
     }));
 
-    const result = await genAI.models.generateContent({
+    const chat = genAI.chats.create({
       model,
-      contents,
+      history,
     });
 
-    const responseText = result.text;
+    const response = await chat.sendMessage({
+      message,
+    });
+
+    const responseText = response.text;
     res.json({ output: responseText });
   } catch (error) {
     console.error("Error in /chat:", error);
