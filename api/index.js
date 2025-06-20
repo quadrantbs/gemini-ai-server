@@ -65,8 +65,8 @@ app.get("/", (req, res) => {
           message: "string (required)",
           history: [
             {
-              role: "user | model (required)",
-              text: "string (required)",
+              role: "user | model",
+              text: "string",
             },
           ],
           historyLimit: "integer (optional, default: 10)",
@@ -210,44 +210,44 @@ app.post("/generate-from-audio", upload.single("audio"), async (req, res) => {
 });
 
 app.post("/chat", async (req, res) => {
-  const { message, history, historyLimit = 10 } = req.body;
+  const { message, history = [], historyLimit = 10 } = req.body;
 
-  if (!Array.isArray(history) || history.length === 0) {
-    return res.status(400).json({ error: "No history provided." });
+  if (typeof message !== "string" || message.trim() === "") {
+    return res
+      .status(400)
+      .json({ error: "Message is required and must be a non-empty string." });
   }
 
-  if (!message && typeof message !== "string") {
-    return res.status(400).json({ error: "Message is required." });
-  }
+  const isValidHistory =
+    Array.isArray(history) &&
+    history.every((msg) => {
+      return (
+        typeof msg === "object" &&
+        msg !== null &&
+        (msg.role === "user" || msg.role === "model") &&
+        typeof msg.text === "string" &&
+        msg.text.trim() !== ""
+      );
+    });
 
-  const isValid = history.every((msg) => {
-    return (
-      typeof msg === "object" &&
-      msg !== null &&
-      (msg.role === "user" || msg.role === "model") &&
-      typeof msg.text === "string" &&
-      msg.text.trim() !== ""
-    );
-  });
-
-  if (!isValid) {
+  if (!isValidHistory && history.length > 0) {
     return res.status(400).json({
       error:
-        "Invalid message format. Each message must be an object with 'sender' ('user' or 'assistant') and non-empty 'text'.",
+        "Invalid history format. Each message must be an object with 'role' ('user' or 'model') and non-empty 'text'.",
     });
   }
 
   try {
     const recentHistory = history.slice(-historyLimit);
 
-    const history = recentHistory.map((msg) => ({
+    const formattedHistory = recentHistory.map((msg) => ({
       role: msg.role,
       parts: [{ text: msg.text }],
     }));
 
     const chat = genAI.chats.create({
       model,
-      history,
+      history: formattedHistory,
     });
 
     const response = await chat.sendMessage({
