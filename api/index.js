@@ -19,31 +19,62 @@ const model = "gemini-2.0-flash";
 
 app.get("/", (req, res) => {
   res.json({
+    info: "Welcome to Gemini AI API server",
+    usage: "Use POST endpoints below to interact with Gemini models",
     endpoints: [
-      { method: "GET", path: "/", description: "List available endpoints" },
       {
         method: "POST",
         path: "/generate-text",
-        description: "Generate text from a prompt",
+        description: "Generate text based on a prompt",
+        body: {
+          prompt: "string (required)",
+        },
       },
       {
         method: "POST",
         path: "/generate-from-image",
-        description: "Generate text from an image and a prompt",
+        description: "Generate text based on an image and optional prompt",
+        formData: {
+          prompt: "string (optional)",
+          image: "file (required)",
+        },
       },
       {
         method: "POST",
         path: "/generate-from-document",
-        description: "Summarize a document",
+        description: "Summarize the uploaded document with optional prompt",
+        formData: {
+          prompt: "string (optional)",
+          document: "file (required)",
+        },
       },
       {
         method: "POST",
         path: "/generate-from-audio",
-        description: "Transcribe audio",
+        description: "Transcribe audio file to text with optional prompt",
+        formData: {
+          prompt: "string (optional)",
+          audio: "file (required)",
+        },
+      },
+      {
+        method: "POST",
+        path: "/chat",
+        description: "Interactive chat with context from previous messages",
+        body: {
+          messages: [
+            {
+              sender: "user | assistant",
+              text: "string",
+            },
+          ],
+          historyLimit: "integer (optional, default: 10)",
+        },
       },
     ],
   });
 });
+
 app.post("/generate-text", async (req, res) => {
   if (!req.body) {
     return res.status(400).json({ error: "No body provided" });
@@ -177,11 +208,54 @@ app.post("/generate-from-audio", upload.single("audio"), async (req, res) => {
   }
 });
 
+app.post("/chat", async (req, res) => {
+  const { messages, historyLimit = 10 } = req.body;
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: "No messages provided." });
+  }
+
+  const isValid = messages.every((msg) => {
+    return (
+      typeof msg === "object" &&
+      msg !== null &&
+      (msg.sender === "user" || msg.sender === "assistant") &&
+      typeof msg.text === "string" &&
+      msg.text.trim() !== ""
+    );
+  });
+
+  if (!isValid) {
+    return res.status(400).json({
+      error:
+        "Invalid message format. Each message must be an object with 'sender' ('user' or 'assistant') and non-empty 'text'.",
+    });
+  }
+
+  try {
+    const recentMessages = messages.slice(-historyLimit);
+
+    const contents = recentMessages.map((msg) => ({
+      role: msg.sender,
+      text: msg.text,
+    }));
+
+    const result = await genAI.models.generateContent({
+      model,
+      contents,
+    });
+
+    const responseText = result.text;
+    res.json({ output: responseText });
+  } catch (error) {
+    console.error("Error in /chat:", error);
+    res.status(500).json({ error: error.message || "Internal Server Error" });
+  }
+});
+
 const port = 3000;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
-
-module.exports = app;
 
 module.exports = app;
